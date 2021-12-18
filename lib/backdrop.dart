@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'login.dart';
 import 'model/product.dart';
 
 const double _kFlingVelocity = 2;
@@ -58,6 +59,17 @@ class _BlackdropState extends State<BackDrop>
     super.dispose();
   }
 
+  @override
+  void didUpdateWidget(BackDrop old) {
+    super.didUpdateWidget(old);
+
+    if (widget.currentCategory != old.currentCategory) {
+      _toggleBackdropLayerVisibility();
+    } else {
+      _controller.fling(velocity: _kFlingVelocity);
+    }
+  }
+
   Widget _buildStack(BuildContext context, BoxConstraints constraints) {
     const double layerTitleHeight = 48;
     final Size layerSize = constraints.biggest;
@@ -79,6 +91,7 @@ class _BlackdropState extends State<BackDrop>
           rect: layerAnimation,
           child: _FrontLayer(
             child: widget.frontLayer,
+            onTap: _toggleBackdropLayerVisibility,
           ),
         )
       ],
@@ -91,22 +104,39 @@ class _BlackdropState extends State<BackDrop>
       systemOverlayStyle: SystemUiOverlayStyle.light,
       elevation: 0,
       titleSpacing: 0,
-      leading: IconButton(
-        icon: Icon(Icons.menu),
-        onPressed: _toggleBackdropLayerVisibility,
+      title: _BackdropTitle(
+        listenable: _controller.view,
+        onPress: _toggleBackdropLayerVisibility,
+        frontTitle: widget.frontTitle,
+        backTitle: widget.backTitle,
       ),
-      title: const Text("SHRINE"),
       actions: [
+        // TODO: Add shortcut to login screen from trailing icons (104)
         IconButton(
-            onPressed: () {},
-            icon: const Icon(
-              Icons.search,
-            )),
+          icon: const Icon(
+            Icons.search,
+            semanticLabel: 'login', // New code
+          ),
+          onPressed: () {
+            // TODO: Add open login (104)
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (BuildContext context) => LoginPage()),
+            );
+          },
+        ),
         IconButton(
-          onPressed: () {},
           icon: const Icon(
             Icons.tune,
+            semanticLabel: 'login', // New code
           ),
+          onPressed: () {
+            // TODO: Add open login (104)
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (BuildContext context) => LoginPage()),
+            );
+          },
         ),
       ],
       backwardsCompatibility: false,
@@ -121,9 +151,11 @@ class _BlackdropState extends State<BackDrop>
 }
 
 class _FrontLayer extends StatelessWidget {
-  const _FrontLayer({Key? key, required this.child}) : super(key: key);
+  const _FrontLayer({Key? key, this.onTap, required this.child})
+      : super(key: key);
 
   final Widget child;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -137,9 +169,101 @@ class _FrontLayer extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onTap,
+            child: Container(
+              height: 40,
+              alignment: AlignmentDirectional.centerStart,
+            ),
+          ),
           Expanded(
             child: child,
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BackdropTitle extends AnimatedWidget {
+  final void Function() onPress;
+  final Widget frontTitle;
+  final Widget backTitle;
+  final Animation<double> _listenable;
+
+  const _BackdropTitle({
+    Key? key,
+    required Animation<double> listenable,
+    required this.onPress,
+    required this.frontTitle,
+    required this.backTitle,
+  })  : _listenable = listenable,
+        super(key: key, listenable: listenable);
+
+  @override
+  Widget build(BuildContext context) {
+    final Animation<double> animation = _listenable;
+    return DefaultTextStyle(
+      style: Theme.of(context).textTheme.headline6!,
+      softWrap: false,
+      overflow: TextOverflow.ellipsis,
+      child: Row(
+        children: [
+          SizedBox(
+            width: 72,
+            child: IconButton(
+              padding: EdgeInsets.only(right: 8),
+              onPressed: this.onPress,
+              icon: Stack(
+                children: [
+                  Opacity(
+                    opacity: animation.value,
+                    child:
+                        const ImageIcon(AssetImage('assets/slanted_menu.png')),
+                  ),
+                  FractionalTranslation(
+                    translation: Tween<Offset>(
+                            begin: Offset.zero, end: const Offset(1, 0))
+                        .evaluate(animation),
+                    child: ImageIcon(
+                      AssetImage('assets/diamond.png'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Stack(
+            children: <Widget>[
+              Opacity(
+                opacity: CurvedAnimation(
+                  parent: ReverseAnimation(animation),
+                  curve: const Interval(0.5, 1.0),
+                ).value,
+                child: FractionalTranslation(
+                  translation: Tween<Offset>(
+                    begin: Offset.zero,
+                    end: const Offset(0.5, 0.0),
+                  ).evaluate(animation),
+                  child: backTitle,
+                ),
+              ),
+              Opacity(
+                opacity: CurvedAnimation(
+                  parent: animation,
+                  curve: const Interval(0.5, 1.0),
+                ).value,
+                child: FractionalTranslation(
+                  translation: Tween<Offset>(
+                    begin: const Offset(-0.25, 0.0),
+                    end: Offset.zero,
+                  ).evaluate(animation),
+                  child: frontTitle,
+                ),
+              ),
+            ],
+          )
         ],
       ),
     );
